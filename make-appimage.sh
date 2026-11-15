@@ -11,8 +11,7 @@ export UPINFO="gh-releases-zsync|${GITHUB_REPOSITORY%/*}|${GITHUB_REPOSITORY#*/}
 export ICON=/usr/share/icons/hicolor/scalable/apps/partitionmanager.svg
 export DESKTOP=/usr/share/applications/org.kde.partitionmanager.desktop
 export STARTUPWMCLASS=org.kde.partitionmanager
-export DEPLOY_QT=1
-export QT_DIR=qt6
+export USE_HOST_DRIVERS=1
 
 # Deploy dependencies
 quick-sharun /usr/bin/partitionmanager /usr/share/config.kcfg 
