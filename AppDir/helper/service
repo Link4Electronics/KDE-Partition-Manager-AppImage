@@ -1,0 +1,4 @@
+[D-BUS Service]
+Name=org.kde.kpmcore.helperinterface
+Exec=env ONELF_MODE=rundir /usr/local/lib/kpm-appimage/kpmcore_externalcommand
+User=root
