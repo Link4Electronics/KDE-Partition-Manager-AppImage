@@ -34,50 +34,54 @@ kpm_installed() {
 	[ -f /usr/local/share/dbus-1/system-services/"$kpm_helper".service ]
 }
 
-if kpm_running; then
-	return 0
-fi
-if [ -f /usr/share/dbus-1/system-services/"$kpm_helper".service ]; then
-	return 0
-fi
-if [ -f /usr/local/share/dbus-1/system-services/"$kpm_helper".service ]; then
-	if [ ! -f "$bundle/version" ]; then
+kpm_start() {
+	if kpm_running; then
 		return 0
 	fi
-fi
-
-for f in "$helper_src" "$helper_dir/install.sh" "$helper_dir/policy" "$helper_dir/conf" "$helper_dir/service" "$helper_dir/version"; do
-	if [ ! -e "$f" ]; then
-		notify -ne "This AppImage is missing its static KPMcore helper."
+	if [ -f /usr/share/dbus-1/system-services/"$kpm_helper".service ]; then
 		return 0
 	fi
-done
+	if [ -f /usr/local/share/dbus-1/system-services/"$kpm_helper".service ]; then
+		if [ ! -f "$bundle/version" ]; then
+			return 0
+		fi
+	fi
 
-if kpm_installed; then
-	return 0
-fi
+	for f in "$helper_src" "$helper_dir/install.sh" "$helper_dir/policy" "$helper_dir/conf" "$helper_dir/service" "$helper_dir/version"; do
+		if [ ! -e "$f" ]; then
+			notify -ne "This AppImage is missing its static KPMcore helper."
+			return 0
+		fi
+	done
 
-if ! notify -dq "KDE Partition Manager needs to install a root-owned helper (one time). Continue?"; then
-	notify -ne "KDE Partition Manager cannot manage disks without its root helper."
-	return 0
-fi
+	if kpm_installed; then
+		return 0
+	fi
 
-rm -rf "$workdir"
-(umask 077; mkdir -p "$workdir") || return 0
-cp -f "$helper_src" "$workdir/kpmcore_externalcommand" || return 0
-cp -f "$helper_dir/install.sh" "$workdir/install.sh" || return 0
-cp -f "$helper_dir/policy" "$workdir/policy" || return 0
-cp -f "$helper_dir/conf" "$workdir/conf" || return 0
-cp -f "$helper_dir/service" "$workdir/service" || return 0
-cp -f "$helper_dir/version" "$workdir/version" || return 0
-chmod 755 "$workdir/install.sh" || return 0
+	if ! notify -dq "KDE Partition Manager needs to install a root-owned helper (one time). Continue?"; then
+		notify -ne "KDE Partition Manager cannot manage disks without its root helper."
+		return 0
+	fi
 
-if ! run_gui_sudo "$workdir/install.sh"; then
-	notify -ne "Could not install the KPMcore helper."
-	return 0
-fi
+	rm -rf "$workdir"
+	(umask 077; mkdir -p "$workdir") || return 0
+	cp -f "$helper_src" "$workdir/kpmcore_externalcommand" || return 0
+	cp -f "$helper_dir/install.sh" "$workdir/install.sh" || return 0
+	cp -f "$helper_dir/policy" "$workdir/policy" || return 0
+	cp -f "$helper_dir/conf" "$workdir/conf" || return 0
+	cp -f "$helper_dir/service" "$workdir/service" || return 0
+	cp -f "$helper_dir/version" "$workdir/version" || return 0
+	chmod 755 "$workdir/install.sh" || return 0
 
-if ! kpm_installed; then
-	notify -ne "KPMcore helper installation failed."
-	return 0
-fi
+	if ! run_gui_sudo "$workdir/install.sh"; then
+		notify -ne "Could not install the KPMcore helper."
+		return 0
+	fi
+
+	if ! kpm_installed; then
+		notify -ne "KPMcore helper installation failed."
+		return 0
+	fi
+}
+
+kpm_start || :
