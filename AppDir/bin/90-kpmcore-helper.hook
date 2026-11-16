@@ -1,0 +1,48 @@
+#!/bin/sh
+# Install or use a root-owned KPMcore helper bundle.
+
+kpm_helper=org.kde.kpmcore.helperinterface
+bundle=/usr/local/lib/kpm-appimage
+app_bundle=$APPDIR/helper-bundle.tar
+app_version=$APPDIR/helper-bundle.version
+
+kpm_bundle_current() {
+	[ -f "$bundle/version" ] || return 1
+	[ "$(cat "$bundle/version")" = "$(cat "$app_version")" ] || return 1
+	[ -f /usr/local/share/dbus-1/system-services/"$kpm_helper".service ]
+}
+
+if [ -f /usr/share/dbus-1/system-services/"$kpm_helper".service ]; then
+	return 0
+fi
+if [ -f /usr/local/share/dbus-1/system-services/"$kpm_helper".service ]; then
+	if [ ! -f "$bundle/version" ]; then
+		return 0
+	fi
+fi
+
+for f in "$app_bundle" "$app_version"; do
+	if [ ! -e "$f" ]; then
+		notify -ne "This AppImage is missing its KPMcore helper bundle."
+		exit 1
+	fi
+done
+
+if kpm_bundle_current; then
+	return 0
+fi
+
+if ! notify -dq "KDE Partition Manager needs to install a root-owned helper (one time). Continue?"; then
+	notify -ne "KDE Partition Manager cannot manage disks without its root helper."
+	exit 1
+fi
+
+if ! cat "$app_bundle" | run_gui_sudo sh -c "set -e; mkdir -p /usr/local/lib/kpm-appimage; tar -C /usr/local/lib/kpm-appimage -xf -; /usr/local/lib/kpm-appimage/install.sh"; then
+	notify -ne "Could not install the KPMcore helper."
+	exit 1
+fi
+
+if ! kpm_bundle_current; then
+	notify -ne "KPMcore helper installation failed."
+	exit 1
+fi

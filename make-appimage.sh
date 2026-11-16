@@ -14,11 +14,8 @@ export STARTUPWMCLASS=org.kde.partitionmanager
 export USE_HOST_DRIVERS=1
 
 # Deploy dependencies
-quick-sharun /usr/bin/partitionmanager /usr/share/config.kcfg 
-
-dst=./AppDir/share/polkit-1/actions
-mkdir -p "$dst"
-cp -v /usr/share/polkit-1/actions/org.kde.kpmcore.externalcommand.policy "$dst"
+quick-sharun /usr/bin/partitionmanager /usr/lib/kpmcore_externalcommand /usr/share/config.kcfg
+sh ./make-helper-bundle.sh
 
 # Turn AppDir into AppImage
 quick-sharun --make-appimage
