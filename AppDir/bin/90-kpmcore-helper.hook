@@ -58,9 +58,7 @@ kpm_start() {
 
 	if kpm_installed; then
 		return 0
-	fi
-
-	if ! notify -dq "KDE Partition Manager needs to install a root-owned helper (one time). Continue?"; then
+	elif ! notify -dq "KDE Partition Manager needs to install a root-owned helper (one time). Continue?"; then
 		notify -ne "KDE Partition Manager cannot manage disks without its root helper."
 		return 0
 	fi
