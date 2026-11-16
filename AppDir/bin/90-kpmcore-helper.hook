@@ -47,7 +47,13 @@ kpm_start() {
 		fi
 	fi
 
-	for f in "$helper_src" "$helper_dir/install.sh" "$helper_dir/policy" "$helper_dir/conf" "$helper_dir/service" "$helper_dir/version"; do
+	for f in \
+		"$helper_src" \
+		"$helper_dir/install.sh" \
+		"$helper_dir/policy" \
+		"$helper_dir/conf" \
+		"$helper_dir/service" \
+		"$helper_dir/version"; do
 		if [ ! -e "$f" ]; then
 			notify -ne "This AppImage is missing its static KPMcore helper."
 			return 0
