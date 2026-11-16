@@ -1,0 +1,88 @@
+#!/bin/sh
+
+# partitionmanager creates a KDBusService when it starts, and KDBusAddons
+# makes the application exit when it cannot reach a D-Bus session bus:
+#
+#   kf.dbusaddons: DBus session bus not found. To circumvent this problem try
+#   the following command (with bash): export $(dbus-launch)
+#
+# Sessions started by systemd or elogind always have a bus, and libdbus finds
+# it on its own at $XDG_RUNTIME_DIR/bus. Other sessions often have none, so
+# start one for this application when it is missing.
+
+# Tries to reach a bus at the given address
+dbus_probe() {
+	if ! is_cmd dbus-send; then
+		# Without a client there is no way to probe, trust the address
+		return 0
+	fi
+	dbus-send --bus="$1" --type=method_call --print-reply --reply-timeout=2000 \
+		--dest=org.freedesktop.DBus / org.freedesktop.DBus.ListNames \
+		>/dev/null 2>&1
+}
+
+# The directory the socket of our bus goes into, only this user may enter it,
+# $XDG_RUNTIME_DIR is per user but the fallback is a directory shared with
+# everyone else
+dbus_runtime_dir() {
+	for _base in "${XDG_RUNTIME_DIR:-}" "${TMPDIR:-/tmp}"; do
+		[ -n "$_base" ] || continue
+		_dir=$_base/dbus-$(id -u)
+		mkdir -p -m 700 "$_dir" 2>/dev/null || :
+		if [ -O "$_dir" ]; then
+			chmod 700 "$_dir" 2>/dev/null || :
+			printf '%s\n' "$_dir"
+			return 0
+		fi
+	done
+	return 1
+}
+
+# The session already points at a bus
+if [ -n "${DBUS_SESSION_BUS_ADDRESS:-}" ] && dbus_probe "$DBUS_SESSION_BUS_ADDRESS"; then
+	return 0
+fi
+
+# The per user bus of systemd and elogind, libdbus finds this one without any
+# environment variable, so leave the session alone
+if [ -n "${XDG_RUNTIME_DIR:-}" ] && [ -S "$XDG_RUNTIME_DIR/bus" ] &&
+	dbus_probe "unix:path=$XDG_RUNTIME_DIR/bus"; then
+	return 0
+fi
+
+runtime_dir=$(dbus_runtime_dir) || :
+if [ -z "$runtime_dir" ]; then
+	err_msg "dbus-session: cannot create a private directory for the socket of a session bus"
+	return 1
+fi
+
+bus_socket=$runtime_dir/partitionmanager-bus
+bus_address="unix:path=$bus_socket"
+
+# The bus a previous launch of this AppImage started
+if [ -S "$bus_socket" ] && dbus_probe "$bus_address"; then
+	export DBUS_SESSION_BUS_ADDRESS="$bus_address"
+	return 0
+fi
+
+if ! is_cmd dbus-daemon; then
+	err_msg "dbus-session: no D-Bus session bus is running and 'dbus-daemon' is not installed"
+	err_msg "dbus-session: install the 'dbus' package, or launch the AppImage with dbus-run-session"
+	return 1
+fi
+
+# Run from / so that the daemon does not keep the current directory busy
+bus_address=$(cd / && dbus-daemon --session --fork --nopidfile \
+	--address="$bus_address" --print-address=1 2>/dev/null) || :
+
+# A failed start means another launch won the race for the socket
+if [ -z "$bus_address" ] && dbus_probe "unix:path=$bus_socket"; then
+	bus_address="unix:path=$bus_socket"
+fi
+
+if [ -z "$bus_address" ]; then
+	err_msg "dbus-session: could not start a D-Bus session bus"
+	return 1
+fi
+
+export DBUS_SESSION_BUS_ADDRESS="$bus_address"
