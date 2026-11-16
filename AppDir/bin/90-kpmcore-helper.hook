@@ -35,8 +35,8 @@ kpm_installed() {
 }
 
 kpm_start() {
-	kpm_running || return 0
-	[ -f /usr/share/dbus-1/system-services/"$kpm_helper".service ] || return 0
+	! kpm_running || return 0
+	[ ! -f /usr/share/dbus-1/system-services/"$kpm_helper".service ] || return 0
 	if [ -f /usr/local/share/dbus-1/system-services/"$kpm_helper".service ]; then
 		[ -f "$bundle/version" ] || return 0
 	fi
@@ -54,7 +54,7 @@ kpm_start() {
 		fi
 	done
 
-	kpm_installed || return 0
+	! kpm_installed || return 0
 	if ! notify -dq "KDE Partition Manager needs to install a root-owned helper (one time). Continue?"; then
 		notify -ne "KDE Partition Manager cannot manage disks without its root helper."
 		return 0
