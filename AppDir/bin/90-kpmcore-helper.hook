@@ -1,16 +1,19 @@
 #!/bin/sh
-# Install or use a root-owned static KPMcore helper.
+# Copy the static KPMcore helper out of the AppImage and install it root-owned.
 
 kpm_helper=org.kde.kpmcore.helperinterface
 bundle=/usr/local/lib/kpm-appimage
-app_bundle=$APPDIR/helper-bundle.tar
-app_version=$APPDIR/helper-bundle.version
+helper_src=$APPDIR/bin/kpmcore_externalcommand
+policy_src=$APPDIR/helper/policy
+conf_src=$APPDIR/helper/conf
+version_src=$APPDIR/helper/version
+workdir=${XDG_CACHE_HOME:-$HOME/.cache}/kpm-appimage-$APPIMAGE_UID
 
-kpm_bundle_current() {
+kpm_installed() {
 	[ -f "$bundle/version" ] || return 1
-	[ -f "$app_version" ] || return 1
+	[ -f "$version_src" ] || return 1
 	read -r installed < "$bundle/version" || return 1
-	read -r expected < "$app_version" || return 1
+	read -r expected < "$version_src" || return 1
 	[ "$installed" = "$expected" ] || return 1
 	[ -f /usr/local/share/dbus-1/system-services/"$kpm_helper".service ]
 }
@@ -24,14 +27,14 @@ if [ -f /usr/local/share/dbus-1/system-services/"$kpm_helper".service ]; then
 	fi
 fi
 
-for f in "$app_bundle" "$app_version"; do
+for f in "$helper_src" "$policy_src" "$conf_src" "$version_src"; do
 	if [ ! -e "$f" ]; then
-		notify -ne "This AppImage is missing its KPMcore helper bundle."
+		notify -ne "This AppImage is missing its static KPMcore helper."
 		exit 1
 	fi
 done
 
-if kpm_bundle_current; then
+if kpm_installed; then
 	return 0
 fi
 
@@ -40,12 +43,24 @@ if ! notify -dq "KDE Partition Manager needs to install a root-owned helper (one
 	exit 1
 fi
 
-if ! cat "$app_bundle" | run_gui_sudo sh -c "set -e; mkdir -p /usr/local/lib/kpm-appimage; tar -C /usr/local/lib/kpm-appimage -xf -; /usr/local/lib/kpm-appimage/install.sh"; then
+(umask 077; mkdir -p "$workdir") || exit 1
+cp -f "$helper_src" "$workdir/kpmcore_externalcommand" || exit 1
+cp -f "$policy_src" "$workdir/policy" || exit 1
+cp -f "$conf_src" "$workdir/conf" || exit 1
+cp -f "$version_src" "$workdir/version" || exit 1
+cat <<-EOF > "$workdir/service"
+	[D-BUS Service]
+	Name=org.kde.kpmcore.helperinterface
+	Exec=env ONELF_MODE=rundir /usr/local/lib/kpm-appimage/kpmcore_externalcommand
+	User=root
+EOF
+
+if ! run_gui_sudo sh -c "set -e; mkdir -p /usr/local/lib/kpm-appimage; cp -f '$workdir/kpmcore_externalcommand' /usr/local/lib/kpm-appimage/kpmcore_externalcommand; chmod 755 /usr/local/lib/kpm-appimage/kpmcore_externalcommand; cp -f '$workdir/version' /usr/local/lib/kpm-appimage/version; if ! cp -f '$workdir/policy' /usr/share/polkit-1/actions/org.kde.kpmcore.externalcommand.policy 2>/dev/null; then mkdir -p /usr/local/share/polkit-1/actions; cp -f '$workdir/policy' /usr/local/share/polkit-1/actions/org.kde.kpmcore.externalcommand.policy; fi; if ! cp -f '$workdir/conf' /etc/dbus-1/system.d/org.kde.kpmcore.helperinterface.conf 2>/dev/null; then mkdir -p /usr/share/dbus-1/system.d; cp -f '$workdir/conf' /usr/share/dbus-1/system.d/org.kde.kpmcore.helperinterface.conf; fi; mkdir -p /usr/local/share/dbus-1/system-services; cp -f '$workdir/service' /usr/local/share/dbus-1/system-services/org.kde.kpmcore.helperinterface.service; if command -v dbus-send >/dev/null 2>&1; then dbus-send --system --type=signal / org.freedesktop.DBus.ReloadConfig >/dev/null 2>&1 || :; fi; if command -v systemctl >/dev/null 2>&1; then systemctl reload dbus 2>/dev/null || systemctl reload dbus-broker 2>/dev/null || :; fi"; then
 	notify -ne "Could not install the KPMcore helper."
 	exit 1
 fi
 
-if ! kpm_bundle_current; then
+if ! kpm_installed; then
 	notify -ne "KPMcore helper installation failed."
 	exit 1
 fi
