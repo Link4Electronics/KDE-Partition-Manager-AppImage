@@ -1,0 +1,82 @@
+#!/bin/sh
+# Copy the static KPMcore helper out of the AppImage and install it root-owned.
+
+kpm_helper=org.kde.kpmcore.helperinterface
+bundle=/usr/local/lib/kpm-appimage
+helper_src=$APPDIR/bin/kpmcore_externalcommand
+helper_dir=$APPDIR/helper
+workdir=${XDG_CACHE_HOME:-$HOME/.cache}/kpm-appimage-$APPIMAGE_UID
+
+kpm_running() {
+	if is_cmd dbus-send; then
+		dbus-send --system --print-reply --dest=org.freedesktop.DBus \
+			/org/freedesktop/DBus org.freedesktop.DBus.NameHasOwner \
+			string:"$kpm_helper" 2>/dev/null | grep -q 'boolean true'
+	elif is_cmd busctl; then
+		busctl --system call org.freedesktop.DBus /org/freedesktop/DBus \
+			org.freedesktop.DBus NameHasOwner s "$kpm_helper" 2>/dev/null | grep -q true
+	elif is_cmd gdbus; then
+		gdbus call --system --dest org.freedesktop.DBus \
+			--object-path /org/freedesktop/DBus \
+			--method org.freedesktop.DBus.NameHasOwner \
+			"$kpm_helper" 2>/dev/null | grep -q true
+	else
+		return 1
+	fi
+}
+
+kpm_installed() {
+	[ -f "$bundle/version" ] || return 1
+	[ -f "$helper_dir/version" ] || return 1
+	read -r installed < "$bundle/version" || return 1
+	read -r expected < "$helper_dir/version" || return 1
+	[ "$installed" = "$expected" ] || return 1
+	[ -f /usr/local/share/dbus-1/system-services/"$kpm_helper".service ]
+}
+
+kpm_start() {
+	! kpm_running || return 0
+	[ ! -f /usr/share/dbus-1/system-services/"$kpm_helper".service ] || return 0
+	if [ -f /usr/local/share/dbus-1/system-services/"$kpm_helper".service ]; then
+		[ -f "$bundle/version" ] || return 0
+	fi
+
+	for f in \
+		"$helper_src" \
+		"$helper_dir/install.sh" \
+		"$helper_dir/policy" \
+		"$helper_dir/conf" \
+		"$helper_dir/service" \
+		"$helper_dir/version"; do
+		if [ ! -e "$f" ]; then
+			notify -ne "This AppImage is missing its static KPMcore helper."
+			return 0
+		fi
+	done
+
+	! kpm_installed || return 0
+	if ! notify -dq "KDE Partition Manager needs to install a root-owned helper (one time). Continue?"; then
+		notify -ne "KDE Partition Manager cannot manage disks without its root helper."
+		return 0
+	fi
+
+	rm -rf "$workdir"
+	(umask 077; mkdir -p "$workdir") || return 0
+	cp -f "$helper_src" "$workdir/kpmcore_externalcommand" || return 0
+	cp -f "$helper_dir/install.sh" "$workdir/install.sh" || return 0
+	cp -f "$helper_dir/policy" "$workdir/policy" || return 0
+	cp -f "$helper_dir/conf" "$workdir/conf" || return 0
+	cp -f "$helper_dir/service" "$workdir/service" || return 0
+	cp -f "$helper_dir/version" "$workdir/version" || return 0
+	chmod 755 "$workdir/install.sh" || return 0
+
+	if ! run_gui_sudo "$workdir/install.sh"; then
+		notify -ne "Could not install the KPMcore helper."
+		return 0
+	elif ! kpm_installed; then
+		notify -ne "KPMcore helper installation failed."
+		return 0
+	fi
+}
+
+kpm_start || :
