@@ -7,6 +7,24 @@ helper_src=$APPDIR/bin/kpmcore_externalcommand
 helper_dir=$APPDIR/helper
 workdir=${XDG_CACHE_HOME:-$HOME/.cache}/kpm-appimage-$APPIMAGE_UID
 
+kpm_running() {
+	if is_cmd dbus-send; then
+		dbus-send --system --print-reply --dest=org.freedesktop.DBus \
+			/org/freedesktop/DBus org.freedesktop.DBus.NameHasOwner \
+			string:"$kpm_helper" 2>/dev/null | grep -q 'boolean true'
+	elif is_cmd busctl; then
+		busctl --system call org.freedesktop.DBus /org/freedesktop/DBus \
+			org.freedesktop.DBus NameHasOwner s "$kpm_helper" 2>/dev/null | grep -q true
+	elif is_cmd gdbus; then
+		gdbus call --system --dest org.freedesktop.DBus \
+			--object-path /org/freedesktop/DBus \
+			--method org.freedesktop.DBus.NameHasOwner \
+			"$kpm_helper" 2>/dev/null | grep -q true
+	else
+		return 1
+	fi
+}
+
 kpm_installed() {
 	[ -f "$bundle/version" ] || return 1
 	[ -f "$helper_dir/version" ] || return 1
@@ -16,6 +34,9 @@ kpm_installed() {
 	[ -f /usr/local/share/dbus-1/system-services/"$kpm_helper".service ]
 }
 
+if kpm_running; then
+	return 0
+fi
 if [ -f /usr/share/dbus-1/system-services/"$kpm_helper".service ]; then
 	return 0
 fi
