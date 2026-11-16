@@ -37,11 +37,9 @@ kpm_installed() {
 kpm_start() {
 	if kpm_running; then
 		return 0
-	fi
-	if [ -f /usr/share/dbus-1/system-services/"$kpm_helper".service ]; then
+	elif [ -f /usr/share/dbus-1/system-services/"$kpm_helper".service ]; then
 		return 0
-	fi
-	if [ -f /usr/local/share/dbus-1/system-services/"$kpm_helper".service ]; then
+	elif [ -f /usr/local/share/dbus-1/system-services/"$kpm_helper".service ]; then
 		if [ ! -f "$bundle/version" ]; then
 			return 0
 		fi
