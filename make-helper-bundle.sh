@@ -4,7 +4,6 @@ set -eu
 
 appdir=${APPDIR:-./AppDir}
 helper_src=$appdir/shared/bin/kpmcore_externalcommand
-builddir=$appdir/onelf-helper
 outbin=$appdir/bin/kpmcore_externalcommand
 bundle=$appdir/helper-bundle
 tarfile=$appdir/helper-bundle.tar
@@ -12,25 +11,9 @@ version=${KPMCORE_VERSION:-$(pacman -Q kpmcore | awk '{print $2}')}
 policy=${KPM_POLICY:-/usr/share/polkit-1/actions/org.kde.kpmcore.externalcommand.policy}
 conf=${KPM_CONF:-/usr/share/dbus-1/system.d/org.kde.kpmcore.helperinterface.conf}
 
-rm -rf "$builddir" "$bundle" "$tarfile"
-mkdir -p "$builddir/bin" "$builddir/lib"
+rm -rf "$bundle" "$tarfile"
 
-cp -f "$helper_src" "$builddir/bin/kpmcore_externalcommand"
-
-LD_LIBRARY_PATH=$appdir/lib ldd "$helper_src" |
-	awk '/=> \// { print $3 } /^\// { print $1 }' |
-	sort -u |
-	while IFS= read -r lib; do
-		case "$lib" in
-			"$appdir"/lib/*) cp -Lf "$lib" "$builddir/lib/${lib##*/}" ;;
-		esac
-	done
-
-ld=$(find "$appdir/lib" -maxdepth 1 -type f -name 'ld-linux*.so*' | head -n 1)
-cp -Lf "$ld" "$builddir/lib/${ld##*/}"
-
-quick-sharun --pack-static-bin "$builddir" "$outbin" bin/kpmcore_externalcommand
-rm -rf "$builddir"
+APPDIR=$appdir quick-sharun --make-static-bin "$helper_src"
 
 mkdir -p "$bundle"
 cp -f "$outbin" "$bundle/kpmcore_externalcommand"

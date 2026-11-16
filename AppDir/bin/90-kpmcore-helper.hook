@@ -8,7 +8,10 @@ app_version=$APPDIR/helper-bundle.version
 
 kpm_bundle_current() {
 	[ -f "$bundle/version" ] || return 1
-	[ "$(cat "$bundle/version")" = "$(cat "$app_version")" ] || return 1
+	[ -f "$app_version" ] || return 1
+	read -r installed < "$bundle/version" || return 1
+	read -r expected < "$app_version" || return 1
+	[ "$installed" = "$expected" ] || return 1
 	[ -f /usr/local/share/dbus-1/system-services/"$kpm_helper".service ]
 }
 
