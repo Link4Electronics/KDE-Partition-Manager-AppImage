@@ -40,9 +40,7 @@ kpm_start() {
 	elif [ -f /usr/share/dbus-1/system-services/"$kpm_helper".service ]; then
 		return 0
 	elif [ -f /usr/local/share/dbus-1/system-services/"$kpm_helper".service ]; then
-		if [ ! -f "$bundle/version" ]; then
-			return 0
-		fi
+		[ -f "$bundle/version" ] || return 0
 	fi
 
 	for f in \
