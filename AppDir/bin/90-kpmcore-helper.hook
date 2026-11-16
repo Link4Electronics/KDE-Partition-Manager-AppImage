@@ -28,7 +28,7 @@ fi
 for f in "$helper_src" "$helper_dir/install.sh" "$helper_dir/policy" "$helper_dir/conf" "$helper_dir/service" "$helper_dir/version"; do
 	if [ ! -e "$f" ]; then
 		notify -ne "This AppImage is missing its static KPMcore helper."
-		exit 1
+		return 0
 	fi
 done
 
@@ -38,25 +38,25 @@ fi
 
 if ! notify -dq "KDE Partition Manager needs to install a root-owned helper (one time). Continue?"; then
 	notify -ne "KDE Partition Manager cannot manage disks without its root helper."
-	exit 1
+	return 0
 fi
 
 rm -rf "$workdir"
-(umask 077; mkdir -p "$workdir") || exit 1
-cp -f "$helper_src" "$workdir/kpmcore_externalcommand" || exit 1
-cp -f "$helper_dir/install.sh" "$workdir/install.sh" || exit 1
-cp -f "$helper_dir/policy" "$workdir/policy" || exit 1
-cp -f "$helper_dir/conf" "$workdir/conf" || exit 1
-cp -f "$helper_dir/service" "$workdir/service" || exit 1
-cp -f "$helper_dir/version" "$workdir/version" || exit 1
-chmod 755 "$workdir/install.sh" || exit 1
+(umask 077; mkdir -p "$workdir") || return 0
+cp -f "$helper_src" "$workdir/kpmcore_externalcommand" || return 0
+cp -f "$helper_dir/install.sh" "$workdir/install.sh" || return 0
+cp -f "$helper_dir/policy" "$workdir/policy" || return 0
+cp -f "$helper_dir/conf" "$workdir/conf" || return 0
+cp -f "$helper_dir/service" "$workdir/service" || return 0
+cp -f "$helper_dir/version" "$workdir/version" || return 0
+chmod 755 "$workdir/install.sh" || return 0
 
 if ! run_gui_sudo "$workdir/install.sh"; then
 	notify -ne "Could not install the KPMcore helper."
-	exit 1
+	return 0
 fi
 
 if ! kpm_installed; then
 	notify -ne "KPMcore helper installation failed."
-	exit 1
+	return 0
 fi
